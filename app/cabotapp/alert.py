@@ -10,6 +10,13 @@ from twilio import twiml
 import requests
 import logging
 
+from time import strftime,gmtime,time
+import urllib2
+import hmac
+import hashlib
+import base64
+import string
+
 logger = logging.getLogger(__name__)
 
 email_template = """Service {{ service.name }} {{ scheme }}://{{ host }}{% url service pk=service.id %} {% if service.overall_status != service.PASSING_STATUS %}alerting with status: {{ service.overall_status }}{% else %}is back to normal{% endif %}.
@@ -37,6 +44,7 @@ def send_alert(service, duty_officers=None):
     if service.hipchat_alert:
         send_hipchat_alert(service, users, duty_officers)
     if service.sms_alert:
+        send_sns_alert(service)
         send_sms_alert(service, users, duty_officers)
     if service.telephone_alert:
         send_telephone_alert(service, users, duty_officers)
@@ -134,6 +142,36 @@ def send_sms_alert(service, users, duty_officers):
             )
         except Exception, e:
             logger.exception('Error sending twilio sms: %s' % e)
+
+def send_sns_alert(service):
+    if settings.SNS_AWS_ACCESS_ID is None:
+        return;
+
+    c = Context({
+        'service': service,
+        'host': settings.WWW_HTTP_HOST,
+        'scheme': settings.WWW_SCHEME,
+    })
+    message = Template(sms_template).render(c)
+    amzsnshost = 'sns.us-east-1.amazonaws.com'
+    params = {'Subject' : message,
+            'TopicArn' : settings.SNS_TOPIC,
+            'Message' : message,
+            'Timestamp' : strftime("%Y-%m-%dT%H:%M:%S.000Z", gmtime(time())),
+            'AWSAccessKeyId' : settings.SNS_AWS_ACCESS_ID,
+            'Action' : 'Publish',
+            'SignatureVersion' : '2',
+            'SignatureMethod' : 'HmacSHA256',
+            } 
+    cannqs=string.join(["%s=%s"%(urllib2.quote(key),urllib2.quote(params[key], safe='-_~')) \
+                                for key in sorted(params.keys())],'&')
+    string_to_sign=string.join(["GET",amzsnshost,"/",cannqs],'\n')
+    sig=base64.b64encode(hmac.new(settings.SNS_AWS_ACCESS_KEY, string_to_sign, digestmod=hashlib.sha256).digest())
+    url="http://%s/?%s&Signature=%s"%(amzsnshost,cannqs,urllib2.quote(sig))
+    try:
+        return urllib2.urlopen(url).read()
+    except urllib2.HTTPError, exception:
+        logger.exception("Error %s (%s):\n%s"%(exception.code,exception.msg,exception.read()));
 
 
 def send_telephone_alert(service, users, duty_officers):
