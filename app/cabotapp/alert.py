@@ -32,7 +32,8 @@ Passing checks:{% for check in service.all_passing_checks %}
 
 hipchat_template = "Service {{ service.name }} {% if service.overall_status == service.PASSING_STATUS %}is back to normal{% else %}reporting {{ service.overall_status }} status{% endif %}: {{ scheme }}://{{ host }}{% url service pk=service.id %}. {% if service.overall_status != service.PASSING_STATUS %}Checks failing:{% for check in service.all_failing_checks %} {{ check.name }}{% if check.last_result.error %} ({{ check.last_result.error|safe }}){% endif %}{% endfor %}{% endif %}{% if alert %}{% for alias in users %} @{{ alias }}{% endfor %}{% endif %}"
 
-sms_template = "Service {{ service.name }} {% if service.overall_status == service.PASSING_STATUS %}is back to normal{% else %}reporting {{ service.overall_status }} status{% endif %}: {{ scheme }}://{{ host }}{% url service pk=service.id %}"
+#sms_template = "Service {{ service.name }} {% if service.overall_status == service.PASSING_STATUS %}is back to normal{% else %}reporting {{ service.overall_status }} status{% endif %}: {{ scheme }}://{{ host }}{% url service pk=service.id %}"
+sms_template = "Service {{ service.name }} {% if service.overall_status == service.PASSING_STATUS %}is back to normal{% else %}reporting {{ service.overall_status }} status{% endif %}: {{ scheme }}://{{ host }}{% url service pk=service.id %}. {% if service.overall_status != service.PASSING_STATUS %}Checks failing:{% for check in service.all_failing_checks %} {{ check.name }}{% if check.last_result.error %} ({{ check.last_result.error|safe }}){% endif %}{% endfor %}{% endif %}"
 
 telephone_template = "This is an urgent message from Arachnys monitoring. Service \"{{ service.name }}\" is erroring. Please check Cabot urgently."
 
@@ -154,8 +155,7 @@ def send_sns_alert(service):
     })
     message = Template(sms_template).render(c)
     amzsnshost = 'sns.us-east-1.amazonaws.com'
-    params = {'Subject' : message,
-            'TopicArn' : settings.SNS_TOPIC,
+    params = {'TopicArn' : settings.SNS_TOPIC,
             'Message' : message,
             'Timestamp' : strftime("%Y-%m-%dT%H:%M:%S.000Z", gmtime(time())),
             'AWSAccessKeyId' : settings.SNS_AWS_ACCESS_ID,
