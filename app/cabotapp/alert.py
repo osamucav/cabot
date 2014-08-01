@@ -66,7 +66,7 @@ def send_email_alert(service, users, duty_officers):
         subject = '%s status for service: %s' % (
             service.overall_status, service.name)
     else:
-        subject = 'Service back to normal: %s' % (service.name,)
+        subject = 'ok: Service back to normal: %s' % (service.name,)
     t = Template(email_template)
     send_mail(
         subject=subject,
